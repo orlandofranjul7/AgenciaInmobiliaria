@@ -1,9 +1,11 @@
 ﻿using AgenciaInmobiliaria_API.Datos;
 using AgenciaInmobiliaria_API.Dto;
 using AgenciaInmobiliaria_API.Modelos;
+using AutoMapper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace AgenciaInmobiliaria_API.Controllers
 {
@@ -20,10 +22,12 @@ namespace AgenciaInmobiliaria_API.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger<InmuebleController> _logger;
-        public InmuebleController(ApplicationDbContext applicationDbContext ,ILogger<InmuebleController> logger)
+        private readonly IMapper _mapper;
+        public InmuebleController(ApplicationDbContext applicationDbContext ,ILogger<InmuebleController> logger, IMapper mapper)
         {
             _context = applicationDbContext;
             _logger = logger;
+            _mapper = mapper;
         }
 
         // Los metodos de los controladores tipo API son EndPoints
@@ -32,19 +36,22 @@ namespace AgenciaInmobiliaria_API.Controllers
 
         /*
          ProduceResponseType se utiliza para documentar los
-        diferetnes tipos de codigos de estado que se manejaran
+        diferentes tipos de codigos de estado que se manejaran
          */
-        public ActionResult<IEnumerable<InmueblesDto>> GetInmuebles()
+        public async Task<ActionResult<IEnumerable<InmueblesDto>>> GetInmuebles()
         {
             _logger.LogInformation("Obtener los inmuebles");
-            return Ok(_context.Inmuebles.ToList());
+
+            IEnumerable<Inmuebles> inmueblesList = await _context.Inmuebles.ToListAsync();
+
+            return Ok(_mapper.Map<IEnumerable<InmueblesDto>>(inmueblesList));
         }
 
         [HttpGet("id:int", Name = "GetInmueble")] // Nombre con el cual nos dirijimos a esta ruta
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<InmueblesDto> GetInmueble(int id)
+        public async Task<ActionResult<InmueblesDto>> GetInmueble(int id)
         {
             if(id==0)
             {
@@ -53,14 +60,14 @@ namespace AgenciaInmobiliaria_API.Controllers
             }
 
             //var inmueble = InmuebleStore.inmuebleList.FirstOrDefault(i => i.id == id);
-            var inmueble = _context.Inmuebles.FirstOrDefault(i => i.id==id);
+            var inmueble = await _context.Inmuebles.FirstOrDefaultAsync(i => i.id==id);
 
             if (inmueble==null) 
             {
                 return NotFound();
             }
 
-            return Ok(inmueble);
+            return Ok(_mapper.Map<InmueblesDto>(inmueble));
         }
 
         [HttpPost]
@@ -72,47 +79,32 @@ namespace AgenciaInmobiliaria_API.Controllers
          [FromBody]: Atributo de C# que le indica a la Web API que debe de
          buscar el parametro del usuario en el cuerpo de la solicitud http
          */
-        public ActionResult<InmueblesDto> CrearInmueble([FromBody] InmueblesDto inmueblesDto)
+        public async Task<ActionResult<InmueblesDto>> CrearInmueble([FromBody] InmueblesCreateDto createDto)
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(inmueblesDto); // Si algunas de las propiedades no es valida (esta vacia, ej) se evitara que siga el flujo del codigo                                                                 
+                return BadRequest(createDto); // Si algunas de las propiedades no es valida (esta vacia, ej) se evitara que siga el flujo del codigo                                                                 
             }
 
             // ModelState Personalizado: En este caso, si existe una villa con el mismo nombre
-            if (_context.Inmuebles.FirstOrDefault(i=>i.Nombre.ToLower() == inmueblesDto.Nombre.ToLower()) !=null)
+            if (await _context.Inmuebles.FirstOrDefaultAsync(i=>i.Nombre.ToLower() == createDto.Nombre.ToLower()) !=null)
             {
                 ModelState.AddModelError("NombreYaExistente","El inmueble con ese nombre ya existe.");
                 return BadRequest(ModelState);
             }
 
-            if (inmueblesDto==null)
+            if (createDto==null)
             {
-                return BadRequest(inmueblesDto);
-            }
-            if (inmueblesDto.id>0) // quiere decir que no necesitamos un id, puesto que se genera automaticamente
-            {
-                return StatusCode(StatusCodes.Status500InternalServerError);
+                return BadRequest(createDto);
             }
 
-            Inmuebles modelo = new()
-            {
-                Nombre = inmueblesDto.Nombre,
-                Detalle = inmueblesDto.Detalle,
-                ImagenUrl = inmueblesDto.ImagenUrl,
-                Ocupantes = inmueblesDto.Ocupantes,
-                Tarifa = inmueblesDto.Tarifa,
-                MetrosCuadrados = inmueblesDto.MetrosCuadrados,
-                Amenidad = inmueblesDto.Amenidad,
-                FechaCreacion = DateTime.Now,
-                FechaActualizacion = DateTime.Now
-            };
+            Inmuebles modelo = _mapper.Map<Inmuebles>(createDto);
 
             // Proceso para realizar un insert en la tabla de la base de datos
-            _context.Inmuebles.Add(modelo);
-            _context.SaveChanges();
+            await _context.Inmuebles.AddAsync(modelo);
+            await _context.SaveChangesAsync();
 
-            return CreatedAtRoute("GetInmueble", new {id= inmueblesDto.id }, inmueblesDto);
+            return CreatedAtRoute("GetInmueble", new {id= modelo.id }, modelo);
 
         }
 
@@ -121,14 +113,14 @@ namespace AgenciaInmobiliaria_API.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         // Se usa IActionResult y no su implementacion debido a que no es necesario
         // el modelo, porque cuando se trabaja don Delete, se debe retornar un No Content
-        public IActionResult DeleteInmueble(int id)
+        public async Task<IActionResult> DeleteInmueble(int id)
         {
             if (id==0)
             {
                 return BadRequest();
             }
 
-            var inmueble = _context.Inmuebles.FirstOrDefault(i=>i.id==id);
+            var inmueble = await _context.Inmuebles.FirstOrDefaultAsync(i=>i.id==id);
 
             if (inmueble==null)
             {
@@ -145,9 +137,9 @@ namespace AgenciaInmobiliaria_API.Controllers
         [HttpPut("{id:int}")] // La ruta de este EndPoint recibira un id
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult UpdateInmueble(int id, [FromBody] InmueblesDto inmueblesDto)
+        public async Task<IActionResult> UpdateInmueble(int id, [FromBody] InmueblesUpdateDto updateDto)
         {
-            if (inmueblesDto==null || id!=inmueblesDto.id )
+            if (updateDto==null || id!=updateDto.id )
             {
                 return BadRequest();
             }
@@ -157,49 +149,34 @@ namespace AgenciaInmobiliaria_API.Controllers
             //inmueble.Ocupantes = inmueblesDto.Ocupantes;
             //inmueble.MetrosCuadrados = inmueblesDto.MetrosCuadrados;
 
-            Inmuebles modelo = new()
-            {
-                id = inmueblesDto.id,
-                Nombre = inmueblesDto.Nombre,
-                Detalle = inmueblesDto.Detalle,
-                ImagenUrl = inmueblesDto.ImagenUrl,
-                Ocupantes = inmueblesDto.Ocupantes,
-                Tarifa = inmueblesDto.Tarifa,
-                MetrosCuadrados = inmueblesDto.MetrosCuadrados,
-                Amenidad = inmueblesDto.Amenidad
-            };
+            Inmuebles modelo = _mapper.Map<Inmuebles>(updateDto);
 
             _context.Update(modelo);
-            _context.SaveChanges();
+            await _context.SaveChangesAsync();
 
             return NoContent();
-
 
         }
 
         [HttpPatch("{id:int}")] // La ruta de este EndPoint recibira un id
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult UpdatePartialInmueble(int id, JsonPatchDocument<InmueblesDto> patchDto)
+        public async Task<IActionResult> UpdatePartialInmueble(int id, JsonPatchDocument<InmueblesUpdateDto> patchDto)
         {
             if (patchDto == null || id != id)
             {
                 return BadRequest();
             }
 
-            var inmueble = _context.Inmuebles.FirstOrDefault(i => i.id == id);
+            var inmueble = await _context.Inmuebles.AsNoTracking().FirstOrDefaultAsync(i => i.id == id);
+            // Se coloca el metodo AsNoTracking() debido a que mas adelante EF core trackeara
+            // otra entidad de tipo inmueble con el mismo id y esto no es valido a la hora de 
+            // de hacer cambios en la Base de datos. A groso modo, no se pueden instanciar 2
+            // registros con el mismo id.
 
-            InmueblesDto inmueblesDto = new()
-            {
-                id = inmueble.id,
-                Nombre = inmueble.Nombre,
-                Detalle = inmueble.Detalle,
-                ImagenUrl = inmueble.ImagenUrl,
-                Ocupantes = inmueble.Ocupantes,
-                Tarifa = inmueble.Tarifa,
-                MetrosCuadrados = inmueble.MetrosCuadrados,
-                Amenidad = inmueble.Amenidad
-            };
+            InmueblesUpdateDto inmueblesDto = _mapper.Map<InmueblesUpdateDto>(inmueble);
+
+
 
             patchDto.ApplyTo(inmueblesDto, ModelState);
 
@@ -214,18 +191,10 @@ namespace AgenciaInmobiliaria_API.Controllers
             // al modelo de tipo inmueble, que es el modelo de la Base de datos
             // y el que es de tipo DbSet, que tiene un metodo para Update
 
-            Inmuebles modelo = new()
-            {
-                id = inmueblesDto.id,
-                Nombre = inmueblesDto.Nombre,
-                Detalle = inmueblesDto.Detalle,
-                ImagenUrl = inmueblesDto.ImagenUrl,
-                Ocupantes = inmueblesDto.Ocupantes,
-                Tarifa = inmueblesDto.Tarifa,
-                MetrosCuadrados = inmueblesDto.MetrosCuadrados,
-                Amenidad = inmueblesDto.Amenidad
-            };
+            Inmuebles modelo = _mapper.Map<Inmuebles>(inmueblesDto);
 
+            _context.Inmuebles.Update(modelo);
+            _context.SaveChanges();
             return NoContent();
 
 

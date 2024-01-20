@@ -1,9 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "Hjhyij9vIA91MrWr75uxmpGGzy6YI6T2Txs+7JB/pmIfns1VG89SghODx5wvcrAgc/toaE8uniP24X3kxhRdaA==",
+  "dgSpecHash": "oeRwkmOi2WCZhEzY1TeIgJxYZ7iBEbOCu+bSHHv1WlGqsBZVKEu/vyWPxm5HevmCWGbixYD2NJevT61sWY2q9Q==",
   "success": true,
   "projectFilePath": "C:\\Users\\ernes\\Desktop\\DEVELOPER\\AgenciaInmobiliaria_API\\AgenciaInmobiliaria_API\\AgenciaInmobiliaria_API.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\ernes\\.nuget\\packages\\automapper\\12.0.1\\automapper.12.0.1.nupkg.sha512",
+    "C:\\Users\\ernes\\.nuget\\packages\\automapper.extensions.microsoft.dependencyinjection\\12.0.1\\automapper.extensions.microsoft.dependencyinjection.12.0.1.nupkg.sha512",
     "C:\\Users\\ernes\\.nuget\\packages\\azure.core\\1.24.0\\azure.core.1.24.0.nupkg.sha512",
     "C:\\Users\\ernes\\.nuget\\packages\\azure.identity\\1.6.0\\azure.identity.1.6.0.nupkg.sha512",
     "C:\\Users\\ernes\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",
